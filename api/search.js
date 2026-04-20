@@ -1,24 +1,29 @@
 export default async function handler(req, res) {
   const { query } = req.query;
+  // 리디북스 BL/eBook 검색 결과 페이지 주소
+  const ridiSearchUrl = `https://ridibooks.com/search?q=${encodeURIComponent(query)}&adult_exclude=n`;
+
   try {
-    // 네이버 도서 검색 API를 사용하여 리디북스 신작까지 검색
-    const response = await fetch(`https://openapi.naver.com/v1/search/book.json?query=${encodeURIComponent(query)}&display=5`, {
-      headers: {
-        'X-Naver-Client-Id': '8MvG5mG_8_N_Nq68_E1c', // 임시 연결 ID
-        'X-Naver-Client-Secret': '3U_8Fz6_T_' // 임시 비밀키
-      }
-    });
-    const data = await response.json();
-    
-    const books = data.items ? data.items.map(item => ({
-      title: item.title.replace(/<[^>]*>?/gm, ''), // HTML 태그 제거
-      author: item.author.replace(/<[^>]*>?/gm, ''),
-      cover: item.image,
-      description: item.description.replace(/<[^>]*>?/gm, '')
-    })) : [];
+    const response = await fetch(ridiSearchUrl);
+    const html = await response.text();
+
+    // 검색 결과 목록에서 책 정보를 추출하는 정규식 (스크래핑)
+    // 리디북스 사이트 구조에 맞춰 제목, 저자, 표지 정보를 긁어옵니다.
+    const bookRegex = /<li class="book_macro_110">([\s\S]*?)<\/li>/g;
+    const books = [];
+    let match;
+
+    while ((match = bookRegex.exec(html)) !== null && books.length < 5) {
+      const content = match[1];
+      const title = content.match(/<span class="title_text">([\s\S]*?)<\/span>/)?.[1]?.trim() || "제목 없음";
+      const author = content.match(/<a class="author">([\s\S]*?)<\/a>/)?.[1]?.trim() || "저자 미상";
+      const cover = content.match(/data-src="(.*?)"/)?.[1] || content.match(/src="(.*?)"/)?.[1] || "";
+
+      books.push({ title, author, cover });
+    }
 
     res.status(200).json(books);
   } catch (error) {
-    res.status(500).json({ error: 'Naver Search failed' });
+    res.status(500).json({ error: '리디북스 검색에 실패했습니다.' });
   }
 }
