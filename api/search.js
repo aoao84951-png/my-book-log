@@ -1,27 +1,28 @@
 export default async function handler(req, res) {
   const { query } = req.query;
-  // 구글에게 "리디북스 사이트 안에서만 이 키워드로 책 찾아줘"라고 요청
-  const googleSearchUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}+site:ridibooks.com&maxResults=5&langRestrict=ko`;
+  // 네이버 모바일 도서 검색 페이지를 직접 읽어옵니다 (가장 가볍고 빠름)
+  const targetUrl = `https://m.search.naver.com/search.naver?where=m_book&query=${encodeURIComponent(query)}`;
 
   try {
-    const response = await fetch(googleSearchUrl);
-    const data = await response.json();
-    
-    const books = data.items ? data.items.map(item => {
-      const info = item.volumeInfo;
-      // 리디북스 특유의 제목 형식에서 군더더기 제거
-      const cleanTitle = info.title.replace(" - 리디", "").replace(" | 리디", "");
+    const response = await fetch(targetUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1' }
+    });
+    const html = await response.text();
+
+    // 검색 결과에서 제목, 저자, 이미지를 가공하는 로직
+    const books = [];
+    const items = html.split('<li class="book_item">').slice(1, 6); // 상위 5개만
+
+    items.forEach(item => {
+      const title = item.match(/<div class="tit">([\s\S]*?)<\/div>/)?.[1]?.replace(/<[^>]*>?/gm, '').trim() || "제목 없음";
+      const author = item.match(/<span class="txt">([\s\S]*?)<\/span>/)?.[1]?.replace(/<[^>]*>?/gm, '').trim() || "저자 미상";
+      const cover = item.match(/src="(.*?)"/)?.[1] || "";
       
-      return {
-        title: cleanTitle,
-        author: info.authors ? info.authors[0] : '저자 미상',
-        // 구글이 찾아준 표지 이미지를 고화질로 변환
-        cover: info.imageLinks ? info.imageLinks.thumbnail.replace('http:', 'https:').replace('zoom=1', 'zoom=2') : ''
-      };
-    }) : [];
+      books.push({ title, author, cover });
+    });
 
     res.status(200).json(books);
   } catch (error) {
-    res.status(500).json({ error: '검색 엔진 연결 실패' });
+    res.status(200).json([{ title: "검색 실패", author: "다시 시도해주세요", cover: "" }]);
   }
 }
