@@ -3,59 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notion Book Search</title>
+    <title>Notion Book Log</title>
     <style>
-        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        .widget-card { width: 280px; height: 280px; background: white; border-radius: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; border: 1px solid #f0f0f0; }
-        .header { position: absolute; top: 15px; left: 20px; font-size: 12px; color: #999; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: transparent; font-family: -apple-system, sans-serif; }
+        .widget-card { width: 280px; height: 280px; background: white; border-radius: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; border: 1px solid #f0f0f0; overflow: hidden; }
+        .header { position: absolute; top: 15px; left: 20px; font-size: 12px; color: #999; font-weight: 600; }
         .time { font-size: 42px; font-weight: 300; color: #333; margin-top: -10px; }
-        .date { font-size: 14px; color: #bbb; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 30px; }
-        .search-btn { background: #f5f5f5; border: none; padding: 10px 25px; border-radius: 12px; color: #777; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; font-size: 15px; }
-        .search-btn:hover { background: #eee; color: #333; }
-        /* 검색 모달 스타일 */
-        #search-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; border-radius: 24px; flex-direction: column; align-items: center; padding-top: 50px; z-index: 10; }
+        .date { font-size: 14px; color: #bbb; text-transform: uppercase; margin-bottom: 30px; }
+        .search-btn { background: #f5f5f5; border: none; padding: 10px 25px; border-radius: 12px; color: #777; cursor: pointer; font-size: 15px; }
+        #search-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; flex-direction: column; align-items: center; padding-top: 50px; z-index: 10; }
         .back-btn { position: absolute; top: 20px; left: 20px; background: none; border: none; font-size: 20px; cursor: pointer; color: #ccc; }
-        .search-input { width: 80%; border: 1px solid #eee; padding: 12px; border-radius: 10px; font-size: 16px; outline: none; margin-bottom: 20px; }
-        .loading-cloud { font-size: 40px; color: #eee; margin-top: 30px; }
+        .search-input { width: 80%; border: 1px solid #eee; padding: 12px; border-radius: 10px; font-size: 16px; outline: none; }
+        .status-msg { margin-top: 20px; font-size: 14px; color: #1f8ce6; font-weight: bold; }
     </style>
 </head>
 <body>
-
     <div class="widget-card">
         <div class="header">🕒 BOOK LOG</div>
-        <div class="time" id="clock">00:00</div>
-        <div class="date" id="date">MON, JAN 01</div>
-        <button class="search-btn" onclick="openSearch()">🔍 search</button>
+        <div id="main-ui">
+            <div class="time" id="clock">00:00</div>
+            <div class="date" id="date">TUE, APR 21</div>
+            <div style="text-align:center;"><button class="search-btn" onclick="openSearch()">🔍 search</button></div>
+        </div>
 
         <div id="search-overlay">
             <button class="back-btn" onclick="closeSearch()">←</button>
             <input type="text" class="search-input" id="bookTitle" placeholder="책 제목을 입력하세요...">
-            <div class="loading-cloud">☁️</div>
-            <div style="color: #999; font-size: 14px; margin-top: 10px;">Search...</div>
+            <div id="loading" style="display:none;" class="status-msg">노션에 기록 중... ☁️</div>
         </div>
     </div>
 
     <script>
         function updateClock() {
             const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            document.getElementById('clock').innerText = `${hours}:${minutes}`;
-            const options = { weekday: 'short', month: 'short', day: '2-digit' };
-            document.getElementById('date').innerText = now.toLocaleDateString('en-US', options).toUpperCase();
+            document.getElementById('clock').innerText = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('date').innerText = now.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'2-digit'}).toUpperCase();
         }
-        setInterval(updateClock, 1000);
-        updateClock();
+        setInterval(updateClock, 1000); updateClock();
 
-        function openSearch() { document.getElementById('search-overlay').style.display = 'flex'; }
-        function closeSearch() { document.getElementById('search-overlay').style.display = 'none'; }
-        
-        document.getElementById('bookTitle').addEventListener('keypress', function (e) {
+        function openSearch() { document.getElementById('search-overlay').style.display = 'flex'; document.getElementById('bookTitle').focus(); }
+        function closeSearch() { document.getElementById('search-overlay').style.display = 'none'; document.getElementById('loading').style.display = 'none'; }
+
+        document.getElementById('bookTitle').addEventListener('keypress', async function (e) {
             if (e.key === 'Enter') {
-                alert(this.value + ' 책을 노션에 저장합니다!');
-                // 여기에 실제 노션 API 전송 로직이 들어갑니다.
-                closeSearch();
+                const title = this.value;
+                if(!title) return;
+                document.getElementById('loading').style.display = 'block';
+
+                // --- 실제 노션 전송 로직 ---
+                try {
+                    const response = await fetch('/api/notion-proxy', { 
+                        method: 'POST',
+                        body: JSON.stringify({ title: title })
+                    });
+                    if (response.ok) {
+                        alert('✅ 노션에 "' + title + '" 기록 완료!');
+                        closeSearch();
+                    } else {
+                        alert('❌ 저장 실패 (설정 확인 필요)');
+                    }
+                } catch (err) {
+                    alert('에러 발생: ' + err);
+                }
                 this.value = '';
+                document.getElementById('loading').style.display = 'none';
             }
         });
     </script>
