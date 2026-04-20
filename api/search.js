@@ -1,24 +1,24 @@
 export default async function handler(req, res) {
   const { query } = req.query;
-  // 네이버 도서 검색 페이지를 직접 읽어옵니다.
-  const targetUrl = `https://search.naver.com/search.naver?where=book&query=${encodeURIComponent(query)}`;
+  // 구글 도서 API를 통해 리디북스 사이트 내 정보만 정밀 검색
+  const googleApiUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}+site:ridibooks.com&maxResults=5&langRestrict=ko`;
 
   try {
-    const response = await fetch(targetUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
+    const response = await fetch(googleApiUrl);
+    const data = await response.json();
+    
+    if (!data.items) return res.status(200).json([]);
+
+    const books = data.items.map(item => {
+      const info = item.volumeInfo;
+      // 리디북스 특유의 제목에서 군더더기 제거
+      const title = info.title.replace(' - 리디', '').replace(' | 리디', '');
+      const author = info.authors ? info.authors[0] : '저자 미상';
+      // 구글 이미지를 고화질로 변환
+      const cover = info.imageLinks ? info.imageLinks.thumbnail.replace('http:', 'https:').replace('zoom=1', 'zoom=2') : '';
+      
+      return { title, author, cover };
     });
-    const html = await response.text();
-
-    // 검색 결과에서 제목, 저자, 이미지를 가공 (정규식 사용)
-    const titles = html.match(/<a class="book_tit".*?>([\s\S]*?)<\/a>/g) || [];
-    const authors = html.match(/<span class="txt">([\s\S]*?)<\/span>/g) || [];
-    const covers = html.match(/<img src="(.*?)"/g) || [];
-
-    const books = titles.slice(0, 5).map((t, i) => ({
-      title: t.replace(/<[^>]*>?/gm, '').trim(),
-      author: authors[i] ? authors[i].replace(/<[^>]*>?/gm, '').trim() : "저자 미상",
-      cover: covers[i+1] ? covers[i+1].match(/"(.*?)"/)[1] : "" 
-    }));
 
     res.status(200).json(books);
   } catch (error) {
